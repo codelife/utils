@@ -1,0 +1,150 @@
+from pathlib import Path
+
+import pandas as pd
+from openpyxl import load_workbook
+
+home_dir = Path.home()
+# 试题的目录
+exam_dir = "Downloads"
+root_dir = home_dir.joinpath(exam_dir)
+
+
+def process_data_by_week(week):
+    question_result_file_name = f"{week}#考试中的试题分析的导出.xls"
+    answer_detail_file_name = f"{week}#试题明细.xlsx"
+    output_file_name = f"第{week}周CRC基础技能培训考核高频错题分析.xlsx"
+
+    question_result_file_path = root_dir.joinpath(root_dir, question_result_file_name)
+    answer_detail_file_path = root_dir.joinpath(root_dir, answer_detail_file_name)
+    output_file_path = root_dir.joinpath(root_dir, output_file_name)
+    if not Path(question_result_file_path).exists() or Path(output_file_path).exists():
+        return False
+
+    print(f"processing week: {question_result_file_path}")
+    questions = pd.read_excel(question_result_file_path)
+    answers = pd.read_excel(answer_detail_file_path, header=1)
+    questions["合格比例"] = questions[["合格人次", "答题人次"]].apply(lambda x: int((x["合格人次"] / x["答题人次"]) * 100), axis=1)
+    questions_ans_single = questions[questions["题型"] == "单选题"].sort_values(by="合格比例")[0:15]
+    questions_ans_multiple = questions[questions["题型"] == "多选题"].sort_values(by="合格比例")[0:15]
+    questions_ans_judge = questions[questions["题型"] == "判断题"].sort_values(by="合格比例")[0:15]
+
+    # 单选题的结果
+    output_results_single = []
+    # 多选题结果
+    output_results_multiple = []
+    # 判断题结果
+    output_results_judge = []
+    writer = pd.ExcelWriter(output_file_path)
+    for index, question in questions_ans_single.iterrows():
+        answer_detail = answers[answers["题干"] == question["题干"]]
+        # 是否全部答错
+        all_wrong = False
+        try:
+            x = answer_detail[answer_detail["是否合格"] == "合格"].iloc[[0]]
+        except:
+            all_wrong = True
+            x = answer_detail.iloc[[0]]
+        try:
+            flag_ans_e = 1
+            y = x[["题型", "题干", "题库", "答案", "选项A", "选项B", "选项C", "选项D", "选项E"]]
+        except Exception:
+            flag_ans_e = 0
+            y = x[["题型", "题干", "题库", "答案", "选项A", "选项B", "选项C", "选项D"]]
+        answer_failed_count = len(answer_detail[answer_detail["是否合格"] == "不合格"])
+        # 答题总人数
+        answers_total = len(answer_detail)
+        answers_failed_ratio = int((answer_failed_count / answers_total) * 100)
+        # 各选项人数
+        ans_A_count = len(answer_detail[answer_detail["答案"] == "A,"])
+        ans_B_count = len(answer_detail[answer_detail["答案"] == "B,"])
+        ans_C_count = len(answer_detail[answer_detail["答案"] == "C,"])
+        ans_D_count = len(answer_detail[answer_detail["答案"] == "D,"])
+        ans_E_count = len(answer_detail[answer_detail["答案"] == "E,"])
+        if flag_ans_e == 1:
+            y["答错情况"] = f"选A {ans_A_count}人, 选B {ans_B_count}人, 选C {ans_C_count}人,  选D {ans_D_count}人, 选E {ans_E_count}人"
+        else:
+            y["答错情况"] = f"选A {ans_A_count}人, 选B {ans_B_count}人, 选C {ans_C_count}人,  选D {ans_D_count}人"
+        if all_wrong:
+            y["答案"] = ""
+        y["答错人数"] = answer_failed_count
+        y["答题总人数"] = answers_total
+        y["错误率"] = answers_failed_ratio
+        y["解析"] = ""
+        y["改进建议"] = ""
+        output_results_single.append(y)
+    output_results_single = pd.concat(output_results_single)
+    output_results_single = output_results_single.sort_values(by="错误率", ascending=False)
+    output_results_single.to_excel(writer, sheet_name="单选题")
+
+    for index, question in questions_ans_multiple.iterrows():
+        answer_detail = answers[answers["题干"] == question["题干"]]
+        # 是否全部答错
+        all_wrong = False
+        try:
+            x = answer_detail[answer_detail["是否合格"] == "合格"].iloc[[0]]
+        except:
+            all_wrong = True
+            x = answer_detail.iloc[[0]]
+        try:
+            flag_ans_e = 1
+            y = x[["题型", "题干", "题库", "答案", "选项A", "选项B", "选项C", "选项D", "选项E"]]
+        except Exception:
+            flag_ans_e = 0
+            y = x[["题型", "题干", "题库", "答案", "选项A", "选项B", "选项C", "选项D"]]
+            y["选项E"] = ""
+        answer_failed_count = len(answer_detail[answer_detail["是否合格"] == "不合格"])
+        # 答题总人数
+        answers_total = len(answer_detail)
+        answers_failed_ratio = int((answer_failed_count / answers_total) * 100)
+        # 各选项人数
+        ans_A_count = len(answer_detail[answer_detail["答案"] == "A,"])
+        ans_B_count = len(answer_detail[answer_detail["答案"] == "B,"])
+        ans_C_count = len(answer_detail[answer_detail["答案"] == "C,"])
+        ans_D_count = len(answer_detail[answer_detail["答案"] == "D,"])
+        ans_E_count = len(answer_detail[answer_detail["答案"] == "E,"])
+        if flag_ans_e == 1:
+            y["答错情况"] = f"选A {ans_A_count}人, 选B {ans_B_count}人, 选C {ans_C_count}人,  选D {ans_D_count}人, 选E {ans_E_count}人"
+        else:
+            y["答错情况"] = f"选A {ans_A_count}人, 选B {ans_B_count}人, 选C {ans_C_count}人,  选D {ans_D_count}人"
+        if all_wrong:
+            y["答案"] = ""
+        y["答错人数"] = answer_failed_count
+        y["答题总人数"] = answers_total
+        y["错误率"] = answers_failed_ratio
+        y["解析"] = ""
+        y["改进建议"] = ""
+        output_results_multiple.append(y)
+    output_results_multiple = pd.concat(output_results_multiple)
+    output_results_multiple = output_results_multiple.sort_values(by="错误率", ascending=False)
+    output_results_multiple.to_excel(writer, sheet_name="多选题")
+
+    for index, question in questions_ans_judge.iterrows():
+        answer_detail = answers[answers["题干"] == question["题干"]]
+        # 是否全部答错
+        all_wrong = False
+        try:
+            x = answer_detail[answer_detail["是否合格"] == "合格"].iloc[[0]]
+        except:
+            all_wrong = True
+            x = answer_detail.iloc[[0]]
+        y = x[["题型", "题干", "题库", "答案"]]
+        answer_failed_count = len(answer_detail[answer_detail["是否合格"] == "不合格"])
+        # 答题总人数
+        answers_total = len(answer_detail)
+        answers_failed_ratio = int((answer_failed_count / answers_total) * 100)
+        if all_wrong:
+            y["答案"] = ""
+        y["答错人数"] = answer_failed_count
+        y["答题总人数"] = answers_total
+        y["错误率"] = answers_failed_ratio
+        y["解析"] = ""
+        y["改进建议"] = ""
+        output_results_judge.append(y)
+    output_results_judge = pd.concat(output_results_judge)
+    output_results_judge = output_results_judge.sort_values(by="错误率", ascending=False)
+    output_results_judge.to_excel(writer, sheet_name="判断题")
+    writer.save()
+
+
+for week in range(1, 52):
+    process_data_by_week(week)
